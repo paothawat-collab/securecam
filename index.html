@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecureCam — CCTV Monitoring</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080b;--surf:#0c0e13;--surf2:#10141c;
+  --brd:#1e2430;--brd2:#2a3140;
+  --txt:#c8d4e3;--txt2:#7a8899;--txt3:#404c5c;
+  --blue:#4d9ef7;--green:#39b54a;--red:#f05252;
+  --amber:#d4960f;--purple:#a78bfa;
+  --blue-bg:#0a1929;--green-bg:#071a0c;--red-bg:#1f0909;--amber-bg:#1c1200;
+  --font:'SF Mono','Courier New',monospace;--r:6px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:var(--font);color:var(--txt)}
+#be-status{display:flex;align-items:center;gap:7px;padding:4px 12px;background:var(--surf2);border-bottom:1px solid var(--brd);font-size:8px;color:var(--txt3);letter-spacing:.3px;flex-shrink:0}
+#bar{height:50px;display:flex;align-items:center;gap:7px;padding:0 12px;background:var(--surf);border-bottom:1px solid var(--brd);flex-shrink:0;overflow:hidden}
+.logo{font-size:13px;font-weight:700;letter-spacing:3px;color:var(--blue);flex-shrink:0}
+.logo b{color:#4d9ef744}
+.vd{width:1px;height:18px;background:var(--brd);flex-shrink:0}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.dg{background:var(--green)}.dr{background:var(--red)}.da{background:var(--amber)}.dm{background:#3a4455}
+.xt{font-size:9px;color:var(--txt3);flex-shrink:0}
+.xv{font-size:9px;flex-shrink:0}
+.sbar{height:4px;background:var(--brd);border-radius:2px;overflow:hidden;width:55px;flex-shrink:0}
+.sfill{height:100%;border-radius:2px;transition:width .4s,background .4s}
+.tbtn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--r);cursor:pointer;color:var(--txt2);font-size:13px;border:none;background:none;transition:all .15s;flex-shrink:0;position:relative}
+.tbtn:hover{background:var(--surf2);color:var(--txt)}
+.tbtn.on{background:var(--blue-bg);color:var(--blue)}
+.badge{font-size:8px;padding:2px 6px;border-radius:3px;font-weight:700;letter-spacing:.4px;white-space:nowrap}
+.bg-g{background:var(--green-bg);color:var(--green);border:1px solid #1a3d22}
+.bg-r{background:var(--red-bg);color:var(--red);border:1px solid #3d1515}
+.bg-a{background:var(--amber-bg);color:var(--amber);border:1px solid #3d2800}
+.bg-b{background:var(--blue-bg);color:var(--blue);border:1px solid #0e2d56}
+.bg-m{background:#141a24;color:var(--txt2);border:1px solid var(--brd)}
+.sel{background:var(--surf2);border:1px solid var(--brd);border-radius:var(--r);color:var(--txt2);font-size:9px;padding:3px 6px;font-family:var(--font)}
+#nb-badge{position:absolute;top:3px;right:3px;width:7px;height:7px;background:var(--red);border-radius:50%;display:none}
+#wrap{display:flex;height:calc(100% - 82px)}
+#sb{width:48px;background:var(--surf);border-right:1px solid var(--brd);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px;flex-shrink:0}
+#ct{flex:1;overflow-y:auto;padding:10px;background:var(--bg)}
+.nvb{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:var(--r);cursor:pointer;color:var(--txt2);font-size:15px;border:none;background:none;transition:all .15s;position:relative}
+.nvb:hover{background:var(--surf2);color:var(--txt)}
+.nvb.on{background:var(--blue-bg);color:var(--blue)}
+.nvb .tip{position:absolute;left:42px;background:var(--surf2);color:var(--txt);font-size:8px;padding:3px 8px;border-radius:var(--r);white-space:nowrap;opacity:0;pointer-events:none;z-index:300;border:1px solid var(--brd);transition:opacity .15s}
+.nvb:hover .tip{opacity:1}
+#sb-sp{flex:1}
+.pan{display:none}.pan.on{display:block}
+#grid{display:grid;gap:8px}
+.g1{grid-template-columns:1fr}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
+.ccard{background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);overflow:hidden;transition:border-color .25s}
+.ccard.mot{border-color:var(--amber);box-shadow:0 0 0 1px #d4960f22}
+.ccard.off{opacity:.5}
+.fw{position:relative;background:#000;overflow:hidden}
+.cam-feed{width:100%;display:block;object-fit:cover;background:#000}
+.scan{position:absolute;left:0;width:100%;height:2px;background:rgba(255,255,255,.012);animation:scan 4s linear infinite;pointer-events:none}
+@keyframes scan{from{top:-2px}to{top:100%}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.feed-ts{position:absolute;bottom:5px;left:6px;font-size:8px;color:#00ff0066}
+.feed-id{position:absolute;top:5px;right:6px;font-size:8px;color:#ffffff22}
+.feed-rec{position:absolute;bottom:5px;right:6px;font-size:7px;background:#f0525233;color:var(--red);border:1px solid #f0525266;padding:1px 4px;border-radius:2px;animation:blink 1.4s ease-in-out infinite}
+.feed-mot{position:absolute;top:5px;left:6px;font-size:7px;background:#d4960f22;color:var(--amber);border:1px solid #d4960f55;padding:1px 5px;border-radius:2px;display:none}
+.feed-st{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#00000088;font-size:10px;gap:5px}
+.mot-box{position:absolute;border:1px dashed var(--amber);pointer-events:none;border-radius:2px;display:none}
+.mot-lbl{position:absolute;top:-13px;left:0;font-size:7px;color:var(--amber);background:#d4960f22;padding:1px 4px;border-radius:2px}
+.cfooter{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:var(--surf2)}
+.cname{font-size:9px;font-weight:700;letter-spacing:.4px;color:var(--txt2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cid{font-size:7px;color:var(--txt3);margin-top:1px}
+.cbtns{display:flex;gap:2px}
+.cb{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:var(--txt2);font-size:11px;border:none;background:none;transition:all .15s}
+.cb:hover{background:var(--brd);color:var(--txt)}
+.cb.rec-on{color:var(--red)}
+.sec{background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:12px;margin-bottom:10px}
+.stit{font-size:9px;letter-spacing:1px;font-weight:700;color:var(--blue);margin-bottom:10px;text-transform:uppercase}
+.row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #0d111799}
+.row:last-child{border-bottom:none;padding-bottom:0}
+.rlbl{font-size:9px;color:var(--txt2)}
+.rval{font-size:9px;color:var(--txt)}
+.tgl{position:relative;width:28px;height:16px;flex-shrink:0}
+.tgl input{opacity:0;width:0;height:0;position:absolute}
+.tsl{position:absolute;inset:0;background:var(--brd);border-radius:8px;cursor:pointer;transition:.2s}
+.tsl::before{content:'';position:absolute;width:12px;height:12px;left:2px;top:2px;background:var(--txt2);border-radius:50%;transition:.2s}
+.tgl input:checked+.tsl{background:var(--green-bg)}
+.tgl input:checked+.tsl::before{transform:translateX(12px);background:var(--green)}
+.finp{background:var(--surf2);border:1px solid var(--brd2);border-radius:var(--r);color:var(--txt);font-size:10px;padding:7px 9px;font-family:var(--font);outline:none;transition:border .15s;width:100%}
+.finp:focus{border-color:var(--blue)}
+.flbl{font-size:9px;letter-spacing:.4px;color:var(--txt2);margin-bottom:4px;display:block}
+.fg{margin-bottom:11px}
+.btn{padding:6px 13px;border-radius:var(--r);font-size:9px;letter-spacing:.5px;font-weight:700;cursor:pointer;border:none;font-family:var(--font);text-transform:uppercase;transition:all .15s}
+.bp{background:var(--blue-bg);color:var(--blue);border:1px solid #1e4a8c}.bp:hover{background:#0f2544}
+.bg_{background:transparent;color:var(--txt2);border:1px solid var(--brd2)}.bg_:hover{background:var(--surf2);color:var(--txt)}
+.bd{background:var(--red-bg);color:var(--red);border:1px solid #3d1515}.bd:hover{background:#2a0b0b}
+.mover{position:fixed;inset:0;z-index:500;background:#00000099;display:none;align-items:center;justify-content:center}
+.mover.on{display:flex}
+.mbox{background:var(--surf);border:1px solid var(--brd2);border-radius:10px;padding:18px;width:380px;max-height:90vh;overflow-y:auto}
+.mtit{font-size:10px;letter-spacing:1px;font-weight:700;color:var(--blue);margin-bottom:14px}
+.mrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.mbtns{display:flex;gap:7px;justify-content:flex-end;margin-top:14px}
+#npan{position:fixed;right:0;top:82px;width:285px;height:calc(100% - 82px);background:var(--surf);border-left:1px solid var(--brd);z-index:200;display:none;flex-direction:column}
+#npan.on{display:flex}
+.np-h{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid var(--brd);flex-shrink:0}
+.np-it{padding:8px 11px;border-bottom:1px solid var(--surf2);cursor:pointer;transition:background .15s}
+.np-it:hover{background:var(--surf2)}
+.np-it.unr{border-left:2px solid var(--blue);background:#0a192912}
+.np-ty{font-size:8px;letter-spacing:.8px;font-weight:700;text-transform:uppercase}
+.np-mg{font-size:9px;color:var(--txt2);margin-top:2px;line-height:1.35}
+.np-tm{font-size:8px;color:var(--txt3);margin-top:1px}
+#fso{position:fixed;inset:0;z-index:400;background:#000;display:none;flex-direction:column}
+#fso.on{display:flex}
+#fs-top{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surf);border-bottom:1px solid var(--brd);flex-shrink:0;flex-wrap:wrap;gap:6px}
+#fs-body{display:flex;flex:1;overflow:hidden}
+#fs-fd{flex:1;background:#050508;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#fs-vid{max-width:100%;max-height:100%;display:block;transition:transform .2s}
+#fs-sb{width:120px;background:var(--surf);border-left:1px solid var(--brd);overflow-y:auto;padding:7px;display:flex;flex-direction:column;gap:5px}
+.fst{border-radius:var(--r);overflow:hidden;border:2px solid transparent;cursor:pointer;transition:border-color .15s}
+.fst.on{border-color:var(--blue)}
+.fstl{font-size:7px;color:var(--txt3);padding:2px 4px;background:var(--surf2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#fs-ctrl{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surf);border-top:1px solid var(--brd);flex-shrink:0;flex-wrap:wrap}
+.zbtns{position:absolute;bottom:12px;right:12px;display:flex;flex-direction:column;gap:4px}
+.zb{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--r);cursor:pointer;color:var(--txt2);font-size:13px;border:1px solid var(--brd);background:#0c0e1399;transition:all .15s}
+.zb:hover{background:var(--surf);color:var(--txt)}
+#fs-zinf{position:absolute;bottom:52px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--txt3);background:#0008;padding:2px 8px;border-radius:3px;opacity:0;transition:opacity .4s;pointer-events:none}
+#fs-mi{position:absolute;top:8px;left:10px;font-size:9px;background:#d4960f22;color:var(--amber);border:1px solid #d4960f55;padding:2px 7px;border-radius:3px;display:none}
+.srow{background:var(--surf2);border:1px solid var(--brd);border-radius:var(--r);padding:10px 12px;margin-bottom:7px;display:flex;align-items:center;gap:10px}
+.si{flex:1;min-width:0}
+.sn{font-size:10px;font-weight:700;color:var(--txt)}
+.su{font-size:8px;color:var(--txt3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss{font-size:8px;margin-top:3px;display:flex;align-items:center;gap:5px}
+.sb2{display:flex;gap:5px;flex-shrink:0;align-items:center}
+.ev-it{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--brd);font-size:9px;align-items:flex-start}
+.ev-tm{color:var(--txt3);min-width:65px;font-size:8px;flex-shrink:0}
+.ev-ty{min-width:55px;font-size:8px;font-weight:700;flex-shrink:0}
+.ev-mg{color:var(--txt2);flex:1;line-height:1.35}
+.metric{background:var(--surf2);border:1px solid var(--brd);border-radius:var(--r);padding:10px;text-align:center}
+.mval{font-size:22px;font-weight:700;margin-bottom:3px}
+.mlbl{font-size:8px;color:var(--txt2);letter-spacing:.5px;text-transform:uppercase}
+.g2m{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.cbar{flex:1;background:var(--blue-bg);border-radius:2px 2px 0 0;min-width:0;transition:background .2s}
+.cbar:hover,.cbar.td{background:var(--blue)}
+.ucrd{display:flex;align-items:center;gap:9px;padding:8px;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--r);margin-bottom:5px}
+.uav{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.tl{height:38px;background:var(--surf);border-radius:var(--r);position:relative;overflow:hidden;border:1px solid var(--brd);margin:8px 0;cursor:crosshair}
+.tl-s{position:absolute;top:7px;height:22px;background:var(--blue-bg);border-radius:2px}
+.tl-m{position:absolute;top:3px;height:8px;background:#d4960f66;border-radius:1px}
+.tl-c{position:absolute;top:0;width:2px;height:100%;background:var(--red)}
+.tl-cl{position:absolute;top:-14px;font-size:8px;color:var(--red);transform:translateX(-50%);white-space:nowrap}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--surf)}::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:3px}
+@media(max-width:768px){.g3{grid-template-columns:1fr 1fr}.g4{grid-template-columns:1fr 1fr}#fs-sb{display:none}}
+@media(max-width:500px){.g2,.g3,.g4{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="be-status">
+  <span class="dot dm" id="be-dot"></span>
+  <span id="be-txt">กำลังเชื่อมต่อ backend...</span>
+  <span style="margin-left:auto" id="be-url-lbl">http://localhost:3000</span>
+</div>
+
+<div id="bar">
+  <span class="logo">SECURE<b>CAM</b></span>
+  <span class="dot dg" id="sys-dot"></span>
+  <span style="font-size:9px;color:var(--green);flex-shrink:0">SYS ONLINE</span>
+  <div class="vd"></div>
+  <span class="xt">CAMS</span><span class="xv" id="cam-ct" style="color:var(--green)">0/0</span>
+  <div class="vd"></div>
+  <span class="xt">STORE</span>
+  <div class="sbar"><div class="sfill" id="stor-bar" style="width:0%"></div></div>
+  <span class="xv" id="stor-lbl">0/500 GB</span>
+  <div class="vd"></div>
+  <span class="xt">GRID</span>
+  <button class="tbtn" id="bg1" onclick="setGrid(1)">&#9632;</button>
+  <button class="tbtn on" id="bg2" onclick="setGrid(2)">&#9729;</button>
+  <button class="tbtn" id="bg3" onclick="setGrid(3)">&#8864;</button>
+  <button class="tbtn" id="bg4" onclick="setGrid(4)">&#8862;</button>
+  <div class="vd"></div>
+  <button class="tbtn" id="nb" onclick="toggleNP()" aria-label="Notifications">&#128276;<span id="nb-badge"></span></button>
+  <button class="tbtn" onclick="openAddCam()" style="color:var(--blue)" title="Add RTSP Camera">&#10133;</button>
+  <div style="width:28px;height:28px;border-radius:50%;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--blue);cursor:pointer;flex-shrink:0" onclick="swt('usr')">AD</div>
+</div>
+
+<div id="wrap">
+<div id="sb">
+  <button class="nvb on" id="n-live" onclick="swt('live')"><span>&#127909;</span><span class="tip">LIVE</span></button>
+  <button class="nvb" id="n-str" onclick="swt('str')"><span>&#128225;</span><span class="tip">STREAMS</span></button>
+  <button class="nvb" id="n-play" onclick="swt('play')"><span>&#9654;</span><span class="tip">PLAYBACK</span></button>
+  <button class="nvb" id="n-ev" onclick="swt('ev')"><span>&#127381;</span><span class="tip">EVENTS</span></button>
+  <div id="sb-sp"></div>
+  <button class="nvb" id="n-set" onclick="swt('set')"><span>&#9881;</span><span class="tip">SETTINGS</span></button>
+  <button class="nvb" id="n-usr" onclick="swt('usr')"><span>&#128101;</span><span class="tip">USERS</span></button>
+  <button class="nvb" id="n-rep" onclick="swt('rep')"><span>&#128202;</span><span class="tip">REPORTS</span></button>
+</div>
+<div id="ct">
+
+<!-- LIVE -->
+<div class="pan on" id="p-live">
+  <div id="grid" class="g2"></div>
+  <div id="no-cams" style="display:none;text-align:center;padding:60px 20px">
+    <div style="font-size:36px;margin-bottom:10px">&#128247;</div>
+    <div style="font-size:11px;color:var(--txt2)">ยังไม่มีกล้อง</div>
+    <div style="font-size:9px;color:var(--txt3);margin:5px 0 14px">คลิก + เพื่อเพิ่มกล้อง RTSP</div>
+    <button class="btn bp" onclick="openAddCam()">+ เพิ่มกล้อง RTSP</button>
+  </div>
+</div>
+
+<!-- STREAMS -->
+<div class="pan" id="p-str">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <span style="font-size:9px;color:var(--blue);letter-spacing:1px">RTSP STREAM MANAGER</span>
+    <div style="display:flex;gap:5px">
+      <button class="btn bg_" style="font-size:8px;padding:3px 8px" onclick="fetchStreams()">&#8635; REFRESH</button>
+      <button class="btn bp" style="font-size:8px;padding:3px 9px" onclick="openAddCam()">+ ADD RTSP</button>
+    </div>
+  </div>
+  <div id="stream-list"></div>
+  <div class="sec" style="margin-top:10px">
+    <div class="stit">&#9888; วิธีใช้</div>
+    <div style="font-size:9px;color:var(--txt2);line-height:1.9">
+      <div>1&#65294; กด <b style="color:var(--blue)">+ ADD RTSP</b> — ใส่ RTSP URL ของกล้อง Yoosee</div>
+      <div>2&#65294; Backend แปลง RTSP → HLS ผ่าน FFmpeg อัตโนมัติ</div>
+      <div>3&#65294; เมื่อ status <b style="color:var(--green)">ONLINE</b> — ภาพปรากฏในหน้า LIVE</div>
+      <div>4&#65294; กด &#9209; STOP / &#9654; START เพื่อควบคุม stream</div>
+      <div>5&#65294; Stream reconnect อัตโนมัติเมื่อหลุด</div>
+      <div style="margin-top:5px;color:var(--txt3)">&#128274; RTSP URL (รหัสผ่าน) เก็บบน server เท่านั้น</div>
+    </div>
+  </div>
+</div>
+
+<!-- PLAYBACK -->
+<div class="pan" id="p-play">
+  <div style="display:flex;gap:7px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <select id="pb-cam" class="sel" style="flex:1;min-width:130px;font-size:10px;padding:5px 8px"></select>
+    <input type="date" id="pb-date" class="finp" style="width:130px;padding:5px 8px">
+    <input type="time" id="pb-time" class="finp" style="width:100px;padding:5px 8px" value="12:00">
+    <button class="btn bp" onclick="pbLoad()">LOAD</button>
+  </div>
+  <div style="background:#000;border-radius:var(--r);overflow:hidden;border:1px solid var(--brd);margin-bottom:7px">
+    <video id="pb-vid" style="width:100%;display:block;height:200px;object-fit:contain;background:#000;transition:transform .2s" controls></video>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:9px">
+    <button class="btn bg_" onclick="pbSkip(-30)" style="font-size:8px;padding:3px 7px">&#10226; 30s</button>
+    <button class="btn bg_" id="pb-pp" onclick="pbPP()" style="font-size:8px;padding:3px 7px">&#9654; PLAY</button>
+    <button class="btn bg_" onclick="pbSkip(30)" style="font-size:8px;padding:3px 7px">30s &#10227;</button>
+    <span style="flex:1"></span>
+    <button class="btn bg_" onclick="pbZoom(0.25)" style="font-size:8px;padding:3px 7px">&#128269;+</button>
+    <button class="btn bg_" onclick="pbZoom(-0.25)" style="font-size:8px;padding:3px 7px">&#128269;-</button>
+    <span class="badge bg-b" id="pb-zl">100%</span>
+    <button class="btn bg_" onclick="pbSnap()" style="font-size:8px;padding:3px 7px">&#128247; SNAP</button>
+  </div>
+  <div style="font-size:8px;color:var(--txt3);margin-top:7px;margin-bottom:3px">TIMELINE</div>
+  <div class="tl" onclick="tlClick(event,this)">
+    <div class="tl-s" style="left:8%;width:30%"></div><div class="tl-s" style="left:47%;width:20%"></div>
+    <div class="tl-m" style="left:20%;width:5%"></div><div class="tl-m" style="left:50%;width:3%"></div>
+    <div class="tl-c" id="tlc" style="left:0%"><div class="tl-cl" id="tll">00:00</div></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--txt3)"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+</div>
+
+<!-- EVENTS -->
+<div class="pan" id="p-ev">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <span style="font-size:9px;color:var(--blue);letter-spacing:1px">EVENT LOG</span>
+    <div style="display:flex;gap:5px;align-items:center">
+      <select id="ev-f" class="sel" onchange="renderEvs()"><option value="">ALL</option><option value="motion">MOTION</option><option value="ai">AI</option><option value="offline">OFFLINE</option><option value="info">INFO</option></select>
+      <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="exportEvs()">CSV</button>
+      <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="if(confirm('ล้าง?')){S.events=[];renderEvs();}">CLEAR</button>
+    </div>
+  </div>
+  <div id="ev-list"></div>
+</div>
+
+<!-- SETTINGS -->
+<div class="pan" id="p-set">
+  <div class="sec">
+    <div class="stit">&#128225; BACKEND SERVER</div>
+    <div class="row"><span class="rlbl">Server URL</span>
+      <div style="display:flex;gap:5px;align-items:center">
+        <input type="text" id="be-inp" class="finp" style="width:190px;padding:4px 7px;font-size:9px" value="http://localhost:3000">
+        <button class="btn bp" style="font-size:8px;padding:3px 7px" onclick="setBE()">SAVE</button>
+        <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="checkBE()">TEST</button>
+      </div>
+    </div>
+    <div class="row"><span class="rlbl">สถานะ</span><span id="be-full-st" class="rval">—</span></div>
+    <div class="row"><span class="rlbl">Active streams</span><span id="be-n" class="rval">—</span></div>
+  </div>
+  <div class="sec">
+    <div class="stit">&#128190; STORAGE</div>
+    <div class="row"><span class="rlbl">Max capacity (GB)</span><input type="number" id="st-max" value="500" class="finp" style="width:90px;padding:4px 7px;font-size:9px" onchange="S.storMax=+this.value;updStor()"></div>
+    <div class="row"><span class="rlbl">Auto-overwrite oldest</span><label class="tgl"><input type="checkbox" checked><span class="tsl"></span></label></div>
+    <div class="row"><span class="rlbl">Cloud backup</span><label class="tgl"><input type="checkbox" checked><span class="tsl"></span></label></div>
+  </div>
+  <div class="sec">
+    <div class="stit">&#9210; RECORDING</div>
+    <div class="row"><span class="rlbl">Mode</span>
+      <div style="display:flex;gap:8px;font-size:9px">
+        <label style="color:var(--txt2);cursor:pointer"><input type="radio" name="rm" value="cont" checked> CONTINUOUS</label>
+        <label style="color:var(--txt2);cursor:pointer"><input type="radio" name="rm" value="motion"> MOTION</label>
+        <label style="color:var(--txt2);cursor:pointer"><input type="radio" name="rm" value="sched"> SCHEDULED</label>
+      </div>
+    </div>
+    <div class="row"><span class="rlbl">Schedule start</span><input type="time" value="08:00" class="finp" style="width:100px;padding:4px 7px;font-size:9px"></div>
+    <div class="row"><span class="rlbl">Schedule end</span><input type="time" value="20:00" class="finp" style="width:100px;padding:4px 7px;font-size:9px"></div>
+  </div>
+  <div class="sec">
+    <div class="stit">&#129504; AI DETECTION</div>
+    <div class="row"><span class="rlbl">Person</span><label class="tgl"><input type="checkbox" checked><span class="tsl"></span></label></div>
+    <div class="row"><span class="rlbl">Face</span><label class="tgl"><input type="checkbox" checked><span class="tsl"></span></label></div>
+    <div class="row"><span class="rlbl">Vehicle</span><label class="tgl"><input type="checkbox" checked><span class="tsl"></span></label></div>
+    <div class="row"><span class="rlbl">Animal</span><label class="tgl"><input type="checkbox"><span class="tsl"></span></label></div>
+  </div>
+  <div class="sec">
+    <div class="stit">&#128274; SECURITY</div>
+    <div class="row"><span class="rlbl">AES-256 encryption</span><label class="tgl"><input type="checkbox" checked><span class="tsl"></span></label></div>
+    <div class="row"><span class="rlbl">Push notifications</span><label class="tgl"><input type="checkbox" checked onchange="reqNotif(this)"><span class="tsl"></span></label></div>
+    <div class="row"><span class="rlbl">Two-factor auth</span><label class="tgl"><input type="checkbox"><span class="tsl"></span></label></div>
+    <div class="row"><span class="rlbl">Watermark on snapshots</span><label class="tgl"><input type="checkbox" id="wm" checked><span class="tsl"></span></label></div>
+  </div>
+</div>
+
+<!-- USERS -->
+<div class="pan" id="p-usr">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <span style="font-size:9px;color:var(--blue);letter-spacing:1px">USER ACCESS CONTROL</span>
+    <button class="btn bp" style="font-size:8px;padding:3px 9px" onclick="openUM()">+ ADD USER</button>
+  </div>
+  <div id="u-list"></div>
+  <div class="sec" style="margin-top:10px">
+    <div class="stit">ROLE PERMISSIONS</div>
+    <table style="width:100%;border-collapse:collapse;font-size:8px;color:var(--txt2)">
+      <tr style="border-bottom:1px solid var(--brd)"><td style="padding:4px 0;color:var(--txt3)">Permission</td><td style="padding:4px;text-align:center;color:var(--amber)">ADMIN</td><td style="padding:4px;text-align:center;color:var(--blue)">OPERATOR</td><td style="padding:4px;text-align:center;color:var(--green)">VIEWER</td></tr>
+      <tr style="border-bottom:1px solid var(--surf2)"><td style="padding:3px 0">View live feeds</td><td style="text-align:center;color:var(--green)">✓</td><td style="text-align:center;color:var(--green)">✓</td><td style="text-align:center;color:var(--green)">✓</td></tr>
+      <tr style="border-bottom:1px solid var(--surf2)"><td style="padding:3px 0">Playback & export</td><td style="text-align:center;color:var(--green)">✓</td><td style="text-align:center;color:var(--green)">✓</td><td style="text-align:center;color:var(--red)">✗</td></tr>
+      <tr style="border-bottom:1px solid var(--surf2)"><td style="padding:3px 0">Camera settings</td><td style="text-align:center;color:var(--green)">✓</td><td style="text-align:center;color:var(--green)">✓</td><td style="text-align:center;color:var(--red)">✗</td></tr>
+      <tr><td style="padding:3px 0">System settings</td><td style="text-align:center;color:var(--green)">✓</td><td style="text-align:center;color:var(--red)">✗</td><td style="text-align:center;color:var(--red)">✗</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- REPORTS -->
+<div class="pan" id="p-rep">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <span style="font-size:9px;color:var(--blue);letter-spacing:1px">SYSTEM REPORT</span>
+    <div style="display:flex;gap:5px">
+      <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="window.print()">&#128196; PDF</button>
+      <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="addN('info','ส่งรายงานอีเมล์แล้ว')">&#9993; EMAIL</button>
+    </div>
+  </div>
+  <div class="g2m">
+    <div class="metric"><div class="mval" id="r-on" style="color:var(--green)">0</div><div class="mlbl">Online</div></div>
+    <div class="metric"><div class="mval" id="r-off" style="color:var(--red)">0</div><div class="mlbl">Offline</div></div>
+    <div class="metric"><div class="mval" id="r-rec" style="color:var(--blue)">0</div><div class="mlbl">Recording</div></div>
+    <div class="metric"><div class="mval" id="r-mot" style="color:var(--amber)">0</div><div class="mlbl">Motion Alerts</div></div>
+  </div>
+  <div class="sec">
+    <div class="stit">STORAGE — 7 DAYS</div>
+    <div style="display:flex;align-items:flex-end;gap:4px;height:60px;margin:4px 0" id="s-chart"></div>
+    <div style="display:flex;gap:4px" id="s-days"></div>
+  </div>
+</div>
+
+</div><!-- /ct -->
+</div><!-- /wrap -->
+
+<!-- NOTIFICATION PANEL -->
+<div id="npan">
+  <div class="np-h">
+    <span style="font-size:9px;letter-spacing:1px;color:var(--blue)">NOTIFICATIONS</span>
+    <div style="display:flex;gap:3px">
+      <button class="cb" onclick="S.notifs.forEach(n=>n.rd=true);renderN();updBadge()">&#10003;</button>
+      <button class="cb" onclick="S.notifs=[];renderN();updBadge()">&#128465;</button>
+      <button class="cb" onclick="toggleNP()">&#10005;</button>
+    </div>
+  </div>
+  <div id="n-list" style="flex:1;overflow-y:auto"></div>
+</div>
+
+<!-- FULLSCREEN -->
+<div id="fso">
+  <div id="fs-top">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="dot dg" id="fs-dot"></span>
+      <span id="fs-nm" style="font-size:10px;font-weight:700;letter-spacing:.5px"></span>
+      <span id="fs-st" class="badge bg-g">ONLINE</span>
+      <span class="badge bg-r" id="fs-rb" style="display:none;animation:blink 1.4s infinite">&#11044; REC</span>
+      <span id="fs-mi-top" class="badge bg-a" style="display:none">&#9650; MOTION</span>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="openShr(S.fsCam)">&#128279; SHARE</button>
+      <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="fsSnap()">&#128247; SNAP</button>
+      <button class="btn bg_" style="font-size:8px;padding:3px 7px" id="fs-recb" onclick="toggleFsRec()">&#11044; REC</button>
+      <button class="tbtn" onclick="closeFso()">&#10005;</button>
+    </div>
+  </div>
+  <div id="fs-body">
+    <div id="fs-fd">
+      <video id="fs-vid" autoplay muted playsinline style="max-width:100%;max-height:100%;display:block"></video>
+      <div class="scan" style="z-index:1;pointer-events:none"></div>
+      <div id="fs-mi">&#9650; MOTION DETECTED</div>
+      <div id="fs-zinf"></div>
+      <div class="zbtns">
+        <button class="zb" onclick="fsZI()">&#128269;+</button>
+        <button class="zb" onclick="fsZO()">&#128269;-</button>
+        <button class="zb" onclick="fsZR()" style="font-size:10px">&#8635;</button>
+      </div>
+      <div style="position:absolute;bottom:5px;left:8px;font-size:8px;color:#00ff0055" id="fs-ts"></div>
+    </div>
+    <div id="fs-sb"><div id="fs-tl" style="display:flex;flex-direction:column;gap:5px"></div></div>
+  </div>
+  <div id="fs-ctrl">
+    <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="fsSkip(-30)">&#10226; 30s</button>
+    <button class="btn bg_" id="fs-ppb" style="font-size:8px;padding:3px 7px" onclick="fsPP()">&#9654; PLAY</button>
+    <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="fsSkip(30)">30s &#10227;</button>
+    <span style="flex:1"></span>
+    <span style="font-size:8px;color:var(--txt3)">SEEK:</span>
+    <input type="datetime-local" class="finp" style="width:auto;font-size:8px;padding:3px 5px" id="fs-seek">
+    <button class="btn bp" style="font-size:8px;padding:3px 7px" onclick="addN('info','Seeking...')">GO</button>
+  </div>
+</div>
+
+<!-- ADD RTSP MODAL -->
+<div class="mover" id="m-add">
+  <div class="mbox">
+    <div class="mtit">&#127760; ADD RTSP CAMERA</div>
+    <div class="fg"><label class="flbl">ชื่อกล้อง</label>
+      <input type="text" id="ac-nm" class="finp" placeholder="เช่น Front Door, Parking A"></div>
+    <div class="fg"><label class="flbl">RTSP URL</label>
+      <input type="text" id="ac-url" class="finp" placeholder="rtsp://admin:pass@192.168.1.x:554/onvif1">
+      <div style="font-size:8px;color:var(--txt3);margin-top:4px;line-height:1.6">
+        &#128274; URL ถูกเก็บบน server เท่านั้น — browser ไม่เห็น credentials<br>
+        Yoosee: <code style="color:var(--blue)">rtsp://admin:PASS@192.168.1.166:554/onvif1</code>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="flbl">PRESETS</label>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="preset('onvif1')">Yoosee/ONVIF</button>
+        <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="preset('stream1')">Generic</button>
+        <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="preset('ch01')">Dahua</button>
+        <button class="btn bg_" style="font-size:8px;padding:3px 7px" onclick="preset('Streaming/Channels/101')">Hikvision</button>
+      </div>
+    </div>
+    <div class="fg">
+      <div style="display:flex;gap:7px;align-items:center">
+        <button class="btn bg_" style="font-size:8px;padding:4px 10px" onclick="testRTSP()">&#9654; TEST</button>
+        <span id="test-st" style="font-size:9px;color:var(--txt3)"></span>
+      </div>
+    </div>
+    <div id="ac-err" style="font-size:9px;color:var(--red);margin-bottom:8px;display:none;padding:6px 8px;background:var(--red-bg);border-radius:var(--r)"></div>
+    <div class="mbtns">
+      <button class="btn bg_" onclick="closeAddCam()">CANCEL</button>
+      <button class="btn bp" id="ac-btn" onclick="confirmAddCam()">ADD CAMERA</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="mover" id="m-edit">
+  <div class="mbox">
+    <div class="mtit">&#9881; CAMERA SETTINGS</div>
+    <div class="fg"><label class="flbl">ชื่อกล้อง</label><input type="text" id="ed-nm" class="finp"></div>
+    <div class="mrow"><span style="font-size:9px;color:var(--txt2)">Motion detection</span><label class="tgl"><input type="checkbox" id="ed-mot" checked><span class="tsl"></span></label></div>
+    <div class="mrow"><span style="font-size:9px;color:var(--txt2)">AI detection</span><label class="tgl"><input type="checkbox" id="ed-ai" checked><span class="tsl"></span></label></div>
+    <div class="mrow"><span style="font-size:9px;color:var(--txt2)">Motion sensitivity</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="range" id="ed-sens" min="1" max="20" value="8" style="width:80px" oninput="document.getElementById('ed-sv').textContent=this.value">
+        <span id="ed-sv" style="font-size:9px;min-width:20px">8</span>
+      </div>
+    </div>
+    <div class="mbtns">
+      <button class="btn bd" onclick="deleteCam()" style="margin-right:auto">DELETE STREAM</button>
+      <button class="btn bg_" onclick="closeEdit()">CANCEL</button>
+      <button class="btn bp" onclick="saveEdit()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div class="mover" id="m-usr">
+  <div class="mbox">
+    <div class="mtit">&#128101; ADD USER</div>
+    <div class="fg"><label class="flbl">ชื่อ</label><input type="text" id="nu-nm" class="finp"></div>
+    <div class="fg"><label class="flbl">อีเมล</label><input type="email" id="nu-em" class="finp"></div>
+    <div class="fg"><label class="flbl">Role</label><select id="nu-rl" class="sel" style="width:100%;font-size:10px;padding:6px 8px"><option value="viewer">VIEWER</option><option value="operator">OPERATOR</option><option value="admin">ADMIN</option></select></div>
+    <div class="mbtns"><button class="btn bg_" onclick="closeUM()">CANCEL</button><button class="btn bp" onclick="confirmUser()">ADD</button></div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="mover" id="m-shr">
+  <div class="mbox">
+    <div class="mtit">&#128279; SHARE CAMERA FEED</div>
+    <div class="fg"><label class="flbl">LINK (expires 24h)</label>
+      <div style="display:flex;gap:5px"><input type="text" id="shr-lnk" class="finp" readonly onclick="this.select()">
+      <button class="btn bg_" onclick="navigator.clipboard.writeText(document.getElementById('shr-lnk').value).then(()=>addN('info','Copied!'))" style="font-size:8px;padding:3px 7px">COPY</button></div>
+    </div>
+    <div class="fg"><label class="flbl">SEND TO EMAIL</label>
+      <div style="display:flex;gap:5px"><input type="email" id="shr-em" class="finp" placeholder="email@example.com">
+      <button class="btn bp" onclick="addN('info','ส่งลิงก์แล้ว');closeShr()" style="font-size:8px;padding:3px 7px">SEND</button></div>
+    </div>
+    <div class="mbtns"><button class="btn bg_" onclick="closeShr()">CLOSE</button></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const TC={motion:'#d4960f',ai:'#4d9ef7',offline:'#f05252',storage:'#f05252',info:'#39b54a',rec:'#4d9ef7',error:'#f05252'};
+let BE=localStorage.getItem('sc_be')||'http://localhost:3000';
+const S={
+  tab:'live',grid:2,fsCam:null,fsZoom:100,pbZoom:1,editId:null,
+  streams:[],localCams:[],
+  notifs:[],events:[],
+  users:[{nm:'Admin User',role:'admin',em:'admin@secure.com',act:true},{nm:'John Operator',role:'operator',em:'john@secure.com',act:true},{nm:'Sara Viewer',role:'viewer',em:'sara@secure.com',act:true}],
+  stats:{motions:0,aiP:0,rec:0},storUsed:0,storMax:500,
+  storHist:[38,42,47,51,55,60,0],
+  prevFrames:{},
+};
+
+// ── BACKEND ──
+async function apiFetch(method,path,body){
+  const o={method,headers:{'Content-Type':'application/json'}};
+  if(body) o.body=JSON.stringify(body);
+  const r=await fetch(BE+path,o);
+  if(!r.ok){const e=await r.json().catch(()=>({error:r.statusText}));throw new Error(e.error||r.statusText);}
+  return r.json();
+}
+async function checkBE(){
+  try{
+    const h=await apiFetch('GET','/api/health');
+    setBESt(true,`Online — ${h.streams} stream(s)`);
+    document.getElementById('be-full-st').textContent='Online ✓';
+    document.getElementById('be-n').textContent=h.streams;
+    return true;
+  }catch(e){
+    setBESt(false,`Offline — ${e.message}`);
+    document.getElementById('be-full-st').textContent='Offline ✗';
+    document.getElementById('be-n').textContent='—';
+    return false;
+  }
+}
+function setBE(){
+  BE=document.getElementById('be-inp').value.trim()||BE;
+  localStorage.setItem('sc_be',BE);
+  document.getElementById('be-url-lbl').textContent=BE;
+  checkBE().then(ok=>{if(ok)fetchStreams();});
+}
+function setBESt(ok,msg){
+  document.getElementById('be-dot').className='dot '+(ok?'dg':'dr');
+  const t=document.getElementById('be-txt');
+  t.textContent=msg;t.style.color=ok?'var(--green)':'var(--red)';
+}
+async function fetchStreams(){
+  try{
+    S.streams=await apiFetch('GET','/api/streams');
+    syncLC();renderGrid();renderSM();updTopBar();updRep();renderPbSel();
+    setBESt(true,`Backend online — ${S.streams.length} stream(s)`);
+  }catch(e){setBESt(false,`Backend offline — ${e.message}`);renderSM();}
+}
+function syncLC(){
+  S.streams.forEach(st=>{
+    let lc=S.localCams.find(c=>c.sid===st.id);
+    if(!lc){lc={sid:st.id,name:st.name,motionEnabled:true,aiEnabled:true,sensitivity:8,hlsObj:null,recording:false,motionActive:false};S.localCams.push(lc);}
+    lc.name=st.name;lc.status=st.status;lc.reconCt=st.reconnectCount;
+    lc.hlsUrl=st.status==='online'?BE+st.hlsUrl:null;
+  });
+  S.localCams=S.localCams.filter(lc=>S.streams.some(s=>s.id===lc.sid));
+}
+setInterval(fetchStreams,5000);
+
+// ── NAV ──
+function swt(t){
+  S.tab=t;
+  document.querySelectorAll('.pan').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nvb').forEach(b=>b.classList.remove('on'));
+  const pm={live:'p-live',str:'p-str',play:'p-play',ev:'p-ev',set:'p-set',usr:'p-usr',rep:'p-rep'};
+  const nm={live:'n-live',str:'n-str',play:'n-play',ev:'n-ev',set:'n-set',usr:'n-usr',rep:'n-rep'};
+  document.getElementById(pm[t])?.classList.add('on');
+  document.getElementById(nm[t])?.classList.add('on');
+  if(t==='rep')updRep();if(t==='str')renderSM();
+}
+
+// ── GRID ──
+function setGrid(n){
+  S.grid=n;[1,2,3,4].forEach(i=>document.getElementById('bg'+i)?.classList.toggle('on',i===n));
+  renderGrid();
+}
+function renderGrid(){
+  const grid=document.getElementById('grid'),nc=document.getElementById('no-cams');
+  grid.className='g'+S.grid;
+  if(!S.localCams.length){nc.style.display='block';grid.style.display='none';return;}
+  nc.style.display='none';grid.style.display='grid';
+  S.localCams.forEach(lc=>{if(!document.getElementById('cc-'+lc.sid))addCard(lc);else refreshCard(lc);});
+  grid.querySelectorAll('.ccard').forEach(c=>{
+    const sid=c.id.replace('cc-','');
+    if(!S.localCams.some(lc=>lc.sid===sid))c.remove();
+  });
+}
+function fh(){return S.grid===4?90:S.grid===3?110:S.grid===1?230:145;}
+function addCard(lc){
+  const grid=document.getElementById('grid');
+  const div=document.createElement('div');
+  div.id='cc-'+lc.sid;div.className='ccard'+(lc.status==='online'?'':' off');
+  div.innerHTML=`<div class="fw" id="fw-${lc.sid}" style="height:${fh()}px">
+    <video id="vid-${lc.sid}" class="cam-feed" autoplay muted playsinline style="height:${fh()}px" aria-label="${esc(lc.name)}"></video>
+    <canvas id="mcvs-${lc.sid}" style="display:none;position:absolute;width:0;height:0" width="160" height="90" aria-hidden="true"></canvas>
+    <div class="scan"></div>
+    <div class="feed-ts" id="ts-${lc.sid}">${nowT()}</div>
+    <div class="feed-id">CAM-${lc.sid.slice(-4).toUpperCase()}</div>
+    <div class="feed-rec" id="frec-${lc.sid}" style="display:${lc.recording?'block':'none'}">&#11044; REC</div>
+    <div class="feed-mot" id="fmot-${lc.sid}">MOTION</div>
+    <div id="fst-${lc.sid}" class="feed-st" style="display:${lc.status==='online'?'none':'flex'}">
+      <span style="font-size:10px;color:${stColor(lc.status)}">${stLabel(lc.status)}</span>
+      ${lc.reconCt?`<span style="font-size:8px;color:var(--txt3)">reconnect #${lc.reconCt}</span>`:''}
+    </div>
+    <div id="mbox-${lc.sid}" class="mot-box"><div class="mot-lbl" id="mlbl-${lc.sid}">PERSON</div></div>
+  </div>
+  <div class="cfooter">
+    <div>
+      <div style="display:flex;align-items:center;gap:3px">
+        <span class="dot ${lc.status==='online'?'dg':'dr'}" id="cdot-${lc.sid}"></span>
+        <span class="cname" id="cnm-${lc.sid}">${esc(lc.name)}</span>
+      </div>
+      <div class="cid">CAM-${lc.sid.slice(-4).toUpperCase()}</div>
+    </div>
+    <div class="cbtns">
+      <button class="cb" onclick="openShr('${lc.sid}')" title="Share">&#128279;</button>
+      <button class="cb" onclick="snapCam('${lc.sid}')" title="Snapshot">&#128247;</button>
+      <button class="cb ${lc.recording?'rec-on':''}" id="rb-${lc.sid}" onclick="toggleRec('${lc.sid}')" title="Record">&#11044;</button>
+      <button class="cb" onclick="openEdit('${lc.sid}')" title="Settings">&#9881;</button>
+      <button class="cb" onclick="openFs('${lc.sid}')" title="Fullscreen">&#10064;</button>
+    </div>
+  </div>`;
+  grid.appendChild(div);
+  if(lc.status==='online'&&lc.hlsUrl)attachHls(lc);
+  setInterval(()=>{const e=document.getElementById('ts-'+lc.sid);if(e)e.textContent=nowT();},1000);
+}
+function refreshCard(lc){
+  const dot=document.getElementById('cdot-'+lc.sid);
+  if(dot)dot.className='dot '+(lc.status==='online'?'dg':'dr');
+  const st=document.getElementById('fst-'+lc.sid);
+  if(st){st.style.display=lc.status==='online'?'none':'flex';if(lc.status!=='online')st.innerHTML=`<span style="font-size:10px;color:${stColor(lc.status)}">${stLabel(lc.status)}</span>${lc.reconCt?`<span style="font-size:8px;color:var(--txt3)">reconnect #${lc.reconCt}</span>`:''}`;}
+  document.getElementById('cc-'+lc.sid)?.classList.toggle('off',lc.status!=='online');
+  const vid=document.getElementById('vid-'+lc.sid);
+  if(lc.status==='online'&&lc.hlsUrl&&vid&&!lc._hlsA)attachHls(lc);
+}
+function attachHls(lc){
+  const vid=document.getElementById('vid-'+lc.sid);if(!vid)return;
+  if(lc.hlsObj){try{lc.hlsObj.destroy();}catch(_){}}
+  lc._hlsA=true;
+  if(Hls.isSupported()){
+    const hls=new Hls({enableWorker:true,lowLatencyMode:true,backBufferLength:30});
+    lc.hlsObj=hls;hls.loadSource(lc.hlsUrl);hls.attachMedia(vid);
+    hls.on(Hls.Events.MANIFEST_PARSED,()=>vid.play().catch(()=>{}));
+    hls.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal)lc._hlsA=false;});
+  }else if(vid.canPlayType('application/vnd.apple.mpegurl')){vid.src=lc.hlsUrl;vid.play().catch(()=>{});}
+}
+
+// ── STREAM MANAGER ──
+function renderSM(){
+  const el=document.getElementById('stream-list');if(!el)return;
+  if(!S.streams.length){el.innerHTML='<div style="font-size:9px;color:var(--txt3);text-align:center;padding:30px">ยังไม่มี stream<br><br><button class="btn bp" onclick="openAddCam()">+ ADD RTSP</button></div>';return;}
+  el.innerHTML=S.streams.map(st=>`<div class="srow">
+    <span class="dot ${st.status==='online'?'dg':st.status==='starting'||st.status==='reconnecting'?'da':'dr'}"></span>
+    <div class="si">
+      <div class="sn">${esc(st.name)}</div>
+      <div class="su">/hls/${st.hlsId}/stream.m3u8</div>
+      <div class="ss"><span style="color:${stColor(st.status)}">${stLabel(st.status)}</span>${st.reconnectCount?`<span style="color:var(--txt3)">· #${st.reconnectCount}</span>`:''}</div>
+    </div>
+    <div class="sb2">
+      ${st.status==='stopped'?`<button class="btn bp" style="font-size:8px;padding:3px 7px" onclick="startSt('${st.id}')">&#9654; START</button>`:`<button class="btn bg_" style="font-size:8px;padding:3px 7px;color:var(--red)" onclick="stopSt('${st.id}')">&#9209; STOP</button>`}
+      <button class="btn bd" style="font-size:8px;padding:3px 7px" onclick="deleteSt('${st.id}')">&#128465;</button>
+    </div>
+  </div>`).join('');
+}
+async function startSt(id){try{await apiFetch('POST',`/api/streams/${id}/start`);fetchStreams();}catch(e){addN('error',e.message);}}
+async function stopSt(id){try{await apiFetch('POST',`/api/streams/${id}/stop`);fetchStreams();}catch(e){addN('error',e.message);}}
+async function deleteSt(id){
+  const st=S.streams.find(s=>s.id===id);
+  if(!confirm(`ลบ "${st?.name}"?`))return;
+  try{
+    await apiFetch('DELETE',`/api/streams/${id}`);
+    const lc=S.localCams.find(c=>c.sid===id);
+    if(lc?.hlsObj){try{lc.hlsObj.destroy();}catch(_){}}
+    document.getElementById('cc-'+id)?.remove();
+    fetchStreams();addN('info',`ลบ "${st?.name}" แล้ว`);
+  }catch(e){addN('error',e.message);}
+}
+
+// ── ADD CAMERA ──
+function openAddCam(){document.getElementById('m-add').classList.add('on');document.getElementById('ac-err').style.display='none';document.getElementById('test-st').textContent='';}
+function closeAddCam(){document.getElementById('m-add').classList.remove('on');}
+function preset(p){
+  const inp=document.getElementById('ac-url');const v=inp.value;
+  const base='rtsp://admin:password@192.168.1.x:554/';
+  if(v&&v.includes('@')){const prefix=v.substring(0,v.lastIndexOf('/')+1);inp.value=prefix+p;}
+  else inp.value=base+p;
+}
+async function testRTSP(){
+  const st=document.getElementById('test-st');
+  st.textContent='⏳ ตรวจสอบ backend...';st.style.color='var(--amber)';
+  const ok=await checkBE();
+  if(ok){st.textContent='✓ Backend พร้อม — กด ADD เพื่อเชื่อมต่อ';st.style.color='var(--green)';}
+  else{st.textContent='✗ Backend offline — รัน: node server.js';st.style.color='var(--red)';}
+}
+async function confirmAddCam(){
+  const name=document.getElementById('ac-nm').value.trim();
+  const rtspUrl=document.getElementById('ac-url').value.trim();
+  const err=document.getElementById('ac-err'),btn=document.getElementById('ac-btn');
+  if(!name){showErr(err,'กรุณาใส่ชื่อกล้อง');return;}
+  if(!rtspUrl.startsWith('rtsp://')){showErr(err,'URL ต้องขึ้นต้นด้วย rtsp://');return;}
+  btn.textContent='⏳ กำลังเพิ่ม...';btn.disabled=true;err.style.display='none';
+  try{
+    await apiFetch('POST','/api/streams',{name,rtspUrl});
+    closeAddCam();
+    document.getElementById('ac-nm').value='';document.getElementById('ac-url').value='';
+    addN('info',`เพิ่มกล้อง "${name}" — รอ FFmpeg เริ่ม...`);
+    logEv('info',name,'RTSP stream added');
+    setTimeout(fetchStreams,1500);
+  }catch(e){showErr(err,e.message);}
+  finally{btn.textContent='ADD CAMERA';btn.disabled=false;}
+}
+function showErr(el,msg){el.textContent=msg;el.style.display='block';}
+
+// ── MOTION DETECTION ──
+setInterval(()=>{
+  S.localCams.forEach(lc=>{
+    if(!lc.motionEnabled||lc.status!=='online')return;
+    const vid=document.getElementById('vid-'+lc.sid);
+    if(!vid||!vid.videoWidth||vid.readyState<2)return;
+    const cvs=document.getElementById('mcvs-'+lc.sid);if(!cvs)return;
+    const ctx=cvs.getContext('2d');ctx.drawImage(vid,0,0,160,90);
+    const frame=ctx.getImageData(0,0,160,90);
+    const prev=S.prevFrames[lc.sid];
+    if(prev){
+      let sum=0;for(let i=0;i<prev.data.length;i+=16)sum+=Math.abs(prev.data[i]-frame.data[i]);
+      const diff=sum/(prev.data.length/16);
+      const thresh=(21-lc.sensitivity)*300;
+      const has=diff>thresh;
+      document.getElementById('fmot-'+lc.sid).style.display=has?'block':'none';
+      document.getElementById('mbox-'+lc.sid).style.cssText+=(has?';display:block;left:20%;top:15%;width:25%;height:55%':';display:none');
+      document.getElementById('cc-'+lc.sid)?.classList.toggle('mot',has);
+      lc.motionActive=has;
+      if(has&&(!lc._lm||Date.now()-lc._lm>8000)){
+        lc._lm=Date.now();S.stats.motions++;
+        addN('motion',`Motion detected — ${lc.name}`);logEv('motion',lc.name,'Motion detected');
+        if(lc.aiEnabled){setTimeout(()=>{addN('ai',`AI: Person detected — ${lc.name}`);S.stats.aiP++;logEv('ai',lc.name,'AI: Person detected');},1500);}
+      }
+      if(S.fsCam===lc.sid)document.getElementById('fs-mi').style.display=has?'block':'none';
+    }
+    S.prevFrames[lc.sid]=frame;
+  });
+},500);
+
+// ── FULLSCREEN ──
+function openFs(sid){
+  S.fsCam=sid;S.fsZoom=100;
+  const lc=S.localCams.find(c=>c.sid===sid);if(!lc)return;
+  const fso=document.getElementById('fso');fso.classList.add('on');
+  document.getElementById('fs-nm').textContent=lc.name.toUpperCase();
+  document.getElementById('fs-dot').className='dot '+(lc.status==='online'?'dg':'dr');
+  const st=document.getElementById('fs-st');st.textContent=lc.status.toUpperCase();st.className='badge '+(lc.status==='online'?'bg-g':'bg-r');
+  document.getElementById('fs-rb').style.display=lc.recording?'inline':'none';
+  document.getElementById('fs-recb').textContent=lc.recording?'⏹ STOP REC':'⏺ REC';
+  document.getElementById('fs-mi').style.display=lc.motionActive?'block':'none';
+  const fsVid=document.getElementById('fs-vid');fsVid.style.transform='';
+  if(lc.hlsUrl){
+    if(S._fsH){try{S._fsH.destroy();}catch(_){}}
+    if(Hls.isSupported()){const h=new Hls({lowLatencyMode:true});S._fsH=h;h.loadSource(lc.hlsUrl);h.attachMedia(fsVid);h.on(Hls.Events.MANIFEST_PARSED,()=>fsVid.play().catch(()=>{}));}
+    else{fsVid.src=lc.hlsUrl;fsVid.play().catch(()=>{});}
+  }
+  const tl=document.getElementById('fs-tl');tl.innerHTML='';
+  S.localCams.forEach(c=>{
+    const d=document.createElement('div');d.className='fst'+(c.sid===sid?' on':'');d.onclick=()=>openFs(c.sid);
+    d.innerHTML=`<div style="height:55px;background:#000;display:flex;align-items:center;justify-content:center;font-size:9px;color:${c.status==='online'?'var(--green)':'var(--red)'}">
+      ${c.status==='online'?'&#11044; LIVE':'OFFLINE'}</div><div class="fstl">${esc(c.name)}</div>`;
+    tl.appendChild(d);
+  });
+  clearInterval(S._fsCk);S._fsCk=setInterval(()=>{const e=document.getElementById('fs-ts');if(e)e.textContent=nowT();},1000);
+}
+function closeFso(){
+  S.fsCam=null;clearInterval(S._fsCk);
+  if(S._fsH){try{S._fsH.destroy();}catch(_){}S._fsH=null;}
+  const v=document.getElementById('fs-vid');if(v){v.src='';v.srcObject=null;}
+  document.getElementById('fso').classList.remove('on');
+}
+function fsZI(){S.fsZoom=Math.min(S.fsZoom+25,400);applyFsZ();}
+function fsZO(){S.fsZoom=Math.max(S.fsZoom-25,50);applyFsZ();}
+function fsZR(){S.fsZoom=100;applyFsZ();}
+function applyFsZ(){
+  document.getElementById('fs-vid').style.transform=`scale(${S.fsZoom/100})`;
+  const zi=document.getElementById('fs-zinf');zi.textContent=S.fsZoom+'%';zi.style.opacity=1;
+  setTimeout(()=>zi.style.opacity=0,1200);
+}
+function fsPP(){const v=document.getElementById('fs-vid');if(!v)return;v.paused?v.play():v.pause();document.getElementById('fs-ppb').textContent=v.paused?'▶ PLAY':'⏸ PAUSE';}
+function fsSkip(s){const v=document.getElementById('fs-vid');if(v&&v.duration)v.currentTime=Math.max(0,v.currentTime+s);}
+function fsSnap(){
+  const lc=S.localCams.find(c=>c.sid===S.fsCam);if(!lc)return;
+  const v=document.getElementById('fs-vid');if(!v||!v.videoWidth){addN('info','ไม่มีภาพ');return;}
+  const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;
+  const ctx=c.getContext('2d');ctx.drawImage(v,0,0);
+  if(document.getElementById('wm')?.checked){ctx.fillStyle='rgba(0,255,0,.4)';ctx.font=`${Math.max(11,c.width*.018)}px monospace`;ctx.fillText(`${lc.name} | ${new Date().toLocaleString('th-TH')}`,8,c.height-8);}
+  c.toBlob(b=>{const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`snap_${lc.name.replace(/\s+/g,'_')}_${Date.now()}.png`;a.click();URL.revokeObjectURL(u);},'image/png');
+  addN('info',`Snapshot — ${lc.name}`);
+}
+function toggleFsRec(){const lc=S.localCams.find(c=>c.sid===S.fsCam);if(!lc)return;toggleRec(lc.sid);document.getElementById('fs-recb').textContent=lc.recording?'⏹ STOP REC':'⏺ REC';document.getElementById('fs-rb').style.display=lc.recording?'inline':'none';}
+
+// ── RECORDING ──
+function toggleRec(sid){
+  const lc=S.localCams.find(c=>c.sid===sid);if(!lc)return;
+  lc.recording=!lc.recording;
+  document.getElementById('rb-'+sid)?.classList.toggle('rec-on',lc.recording);
+  const re=document.getElementById('frec-'+sid);if(re)re.style.display=lc.recording?'block':'none';
+  addN(lc.recording?'rec':'info',`${lc.recording?'เริ่ม':'หยุด'}บันทึก — ${lc.name}`);
+  logEv(lc.recording?'rec':'info',lc.name,lc.recording?'Recording started':'Recording stopped');
+  if(lc.recording){
+    const vid=document.getElementById('vid-'+sid);
+    if(vid?.captureStream){
+      const stream=vid.captureStream();
+      try{const mr=new MediaRecorder(stream,{mimeType:'video/webm'});lc._mr=mr;lc._ch=[];mr.ondataavailable=e=>{if(e.data.size)lc._ch.push(e.data);};mr.onstop=()=>{const b=new Blob(lc._ch,{type:'video/webm'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`${lc.name.replace(/\s+/g,'_')}_${Date.now()}.webm`;a.click();URL.revokeObjectURL(u);addN('info',`บันทึก "${lc.name}" ดาวน์โหลดแล้ว`);};mr.start(1000);}catch(_){}
+    }
+  }else{if(lc._mr?.state!=='inactive')lc._mr?.stop();}
+  updRep();
+}
+function snapCam(sid){
+  const lc=S.localCams.find(c=>c.sid===sid);if(!lc)return;
+  const vid=document.getElementById('vid-'+sid);if(!vid||!vid.videoWidth){addN('info','กล้อง offline');return;}
+  const c=document.createElement('canvas');c.width=vid.videoWidth;c.height=vid.videoHeight;
+  c.getContext('2d').drawImage(vid,0,0);
+  if(document.getElementById('wm')?.checked){const ctx=c.getContext('2d');ctx.fillStyle='rgba(0,255,0,.4)';ctx.font=`${Math.max(10,c.width*.015)}px monospace`;ctx.fillText(`${lc.name} | ${new Date().toLocaleString('th-TH')}`,8,c.height-8);}
+  c.toBlob(b=>{const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`snap_${lc.name.replace(/\s+/g,'_')}_${Date.now()}.png`;a.click();URL.revokeObjectURL(u);},'image/png');
+  addN('info',`Snapshot — ${lc.name}`);
+}
+
+// ── EDIT ──
+function openEdit(sid){
+  S.editId=sid;const lc=S.localCams.find(c=>c.sid===sid);if(!lc)return;
+  document.getElementById('ed-nm').value=lc.name;
+  document.getElementById('ed-mot').checked=lc.motionEnabled;
+  document.getElementById('ed-ai').checked=lc.aiEnabled;
+  document.getElementById('ed-sens').value=lc.sensitivity||8;
+  document.getElementById('ed-sv').textContent=lc.sensitivity||8;
+  document.getElementById('m-edit').classList.add('on');
+}
+function closeEdit(){document.getElementById('m-edit').classList.remove('on');}
+function saveEdit(){
+  const lc=S.localCams.find(c=>c.sid===S.editId);if(!lc)return;
+  lc.name=document.getElementById('ed-nm').value.trim()||lc.name;
+  lc.motionEnabled=document.getElementById('ed-mot').checked;
+  lc.aiEnabled=document.getElementById('ed-ai').checked;
+  lc.sensitivity=+document.getElementById('ed-sens').value||8;
+  const e=document.getElementById('cnm-'+S.editId);if(e)e.textContent=lc.name;
+  closeEdit();addN('info',`อัปเดต "${lc.name}"`);
+}
+function deleteCam(){const st=S.streams.find(s=>s.id===S.editId);if(confirm(`ลบ "${st?.name}"?`)){closeEdit();deleteSt(S.editId);}}
+
+// ── NOTIFS ──
+function toggleNP(){document.getElementById('npan').classList.toggle('on');}
+function addN(ty,msg){
+  const n={id:Date.now()+'_'+Math.random(),ty,msg,tm:nowT2(),rd:false};
+  S.notifs.unshift(n);if(S.notifs.length>100)S.notifs.pop();
+  renderN();updBadge();
+  if(Notification.permission==='granted'){try{new Notification('SecureCam',{body:msg});}catch(_){}}
+}
+function renderN(){
+  const l=document.getElementById('n-list');if(!l)return;
+  if(!S.notifs.length){l.innerHTML='<div style="padding:20px;text-align:center;font-size:9px;color:var(--txt3)">ไม่มีการแจ้งเตือน</div>';return;}
+  l.innerHTML=S.notifs.map(n=>`<div class="np-it${n.rd?'':' unr'}" onclick="markR('${n.id}')">
+    <div class="np-ty" style="color:${TC[n.ty]||'var(--txt2)'}">${n.ty.toUpperCase()}</div>
+    <div class="np-mg">${esc(n.msg)}</div><div class="np-tm">${n.tm}</div>
+  </div>`).join('');
+}
+function markR(id){const n=S.notifs.find(x=>x.id===id);if(n){n.rd=true;renderN();updBadge();}}
+function updBadge(){const u=S.notifs.filter(n=>!n.rd).length;const b=document.getElementById('nb-badge');if(b)b.style.display=u?'block':'none';}
+async function reqNotif(cb){if(cb.checked&&Notification.permission==='default'){const p=await Notification.requestPermission();if(p!=='granted'){cb.checked=false;addN('info','การแจ้งเตือนถูกปฏิเสธ');}}}
+
+// ── EVENTS ──
+function logEv(ty,cam,msg){S.events.unshift({ty,cam,msg,tm:nowT()});if(S.events.length>500)S.events.pop();if(S.tab==='ev')renderEvs();}
+function renderEvs(){
+  const l=document.getElementById('ev-list');if(!l)return;
+  const f=document.getElementById('ev-f')?.value||'';
+  const evs=f?S.events.filter(e=>e.ty===f):S.events;
+  if(!evs.length){l.innerHTML='<div style="padding:20px;text-align:center;font-size:9px;color:var(--txt3)">ไม่มีเหตุการณ์</div>';return;}
+  l.innerHTML=evs.slice(0,200).map(e=>`<div class="ev-it" style="border-left:2px solid ${TC[e.ty]||'var(--brd)'};padding-left:7px">
+    <span class="ev-tm">${e.tm}</span><span class="ev-ty" style="color:${TC[e.ty]||'var(--txt2)'}">${e.ty.toUpperCase()}</span>
+    <span class="ev-mg">[${esc(e.cam)}] ${esc(e.msg)}</span></div>`).join('');
+}
+function exportEvs(){const csv=[['Time','Type','Camera','Event'],...S.events.map(e=>[e.tm,e.ty,e.cam,e.msg])].map(r=>r.join(',')).join('\n');const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='events_'+Date.now()+'.csv';a.click();}
+
+// ── USERS ──
+function renderUsers(){
+  const l=document.getElementById('u-list');if(!l)return;
+  const rc={admin:'var(--amber)',operator:'var(--blue)',viewer:'var(--green)'};
+  const rb={admin:'var(--amber-bg)',operator:'var(--blue-bg)',viewer:'var(--green-bg)'};
+  l.innerHTML=S.users.map((u,i)=>`<div class="ucrd">
+    <div class="uav" style="background:${rb[u.role]};color:${rc[u.role]}">${u.nm.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+    <div style="flex:1;min-width:0"><div style="font-size:9px;font-weight:700;color:var(--txt)">${esc(u.nm)}</div><div style="font-size:8px;color:var(--txt3)">${esc(u.em)}</div></div>
+    <span class="badge" style="background:${rb[u.role]};color:${rc[u.role]};border:1px solid ${rc[u.role]}44">${u.role.toUpperCase()}</span>
+    <span class="dot ${u.act?'dg':'dm'}"></span>
+    <button class="cb" onclick="S.users.splice(${i},1);renderUsers()">&#10005;</button>
+  </div>`).join('');
+}
+function openUM(){document.getElementById('m-usr').classList.add('on');}
+function closeUM(){document.getElementById('m-usr').classList.remove('on');}
+function confirmUser(){
+  const nm=document.getElementById('nu-nm').value.trim(),em=document.getElementById('nu-em').value.trim(),role=document.getElementById('nu-rl').value;
+  if(!nm||!em){alert('กรุณากรอกชื่อและอีเมล');return;}
+  S.users.push({nm,em,role,act:true});closeUM();renderUsers();addN('info',`เพิ่มผู้ใช้ "${nm}" แล้ว`);
+  document.getElementById('nu-nm').value='';document.getElementById('nu-em').value='';
+}
+
+// ── SHARE ──
+function openShr(sid){
+  const t=btoa(`s=${sid}&t=${Date.now()}`).replace(/=/g,'');
+  document.getElementById('shr-lnk').value=`${location.origin}${location.pathname}?view=${t}`;
+  document.getElementById('m-shr').classList.add('on');
+}
+function closeShr(){document.getElementById('m-shr').classList.remove('on');}
+
+// ── STORAGE / REPORTS ──
+function updStor(){
+  const pct=Math.min(100,S.storUsed/S.storMax*100);
+  const c=pct>90?'var(--red)':pct>70?'var(--amber)':'var(--green)';
+  const b=document.getElementById('stor-bar');if(b){b.style.width=pct.toFixed(1)+'%';b.style.background=c;}
+  const l=document.getElementById('stor-lbl');if(l){l.textContent=`${S.storUsed.toFixed(1)}/${S.storMax} GB`;l.style.color=c;}
+}
+function updRep(){
+  const on=S.localCams.filter(c=>c.status==='online').length;
+  const off=S.localCams.filter(c=>c.status!=='online').length;
+  const rec=S.localCams.filter(c=>c.recording).length;
+  const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  s('r-on',on);s('r-off',off);s('r-rec',rec);s('r-mot',S.stats.motions);
+  renderSChart();
+}
+function updTopBar(){const on=S.localCams.filter(c=>c.status==='online').length;const e=document.getElementById('cam-ct');if(e)e.textContent=`${on}/${S.localCams.length}`;}
+function renderSChart(){
+  const c=document.getElementById('s-chart'),d=document.getElementById('s-days');if(!c||!d)return;
+  const days=['จ','อ','พ','พฤ','ศ','ส','อา'];const vals=S.storHist;const mx=Math.max(...vals,1);
+  c.innerHTML=vals.map((v,i)=>`<div class="cbar${i===6?' td':''}" style="height:${(v/mx*100).toFixed(0)}%;min-height:3px" title="${v}GB"></div>`).join('');
+  d.innerHTML=days.map(day=>`<div style="flex:1;font-size:8px;color:var(--txt3);text-align:center">${day}</div>`).join('');
+}
+function renderPbSel(){const s=document.getElementById('pb-cam');if(!s)return;s.innerHTML=S.localCams.length?S.localCams.map(c=>`<option value="${c.sid}">${esc(c.name)}</option>`).join(''):'<option>ไม่มีกล้อง</option>';}
+
+// ── PLAYBACK ──
+function pbLoad(){
+  const sid=document.getElementById('pb-cam').value;const lc=S.localCams.find(c=>c.sid===sid);if(!lc){addN('info','เลือกกล้องก่อน');return;}
+  const vid=document.getElementById('pb-vid');
+  if(lc.hlsUrl){
+    if(S._pbH){try{S._pbH.destroy();}catch(_){}}
+    if(Hls.isSupported()){const h=new Hls();S._pbH=h;h.loadSource(lc.hlsUrl);h.attachMedia(vid);h.on(Hls.Events.MANIFEST_PARSED,()=>vid.play().catch(()=>{}));}
+    else{vid.src=lc.hlsUrl;vid.play().catch(()=>{});}
+    addN('info',`โหลด stream — ${lc.name}`);
+  }else{addN('info','กล้อง offline');}
+}
+function pbPP(){const v=document.getElementById('pb-vid');if(!v)return;v.paused?v.play():v.pause();document.getElementById('pb-pp').textContent=v.paused?'▶ PLAY':'⏸ PAUSE';}
+function pbSkip(s){const v=document.getElementById('pb-vid');if(v&&v.duration)v.currentTime=Math.max(0,v.currentTime+s);}
+let _pbz=1;
+function pbZoom(d){_pbz=Math.max(.5,Math.min(4,_pbz+d));document.getElementById('pb-vid').style.transform=`scale(${_pbz})`;document.getElementById('pb-zl').textContent=Math.round(_pbz*100)+'%';}
+function pbSnap(){const v=document.getElementById('pb-vid');if(!v||!v.videoWidth){addN('info','ไม่มีภาพ');return;}const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);c.toBlob(b=>{const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='pb_snap_'+Date.now()+'.png';a.click();URL.revokeObjectURL(u);},'image/png');addN('info','Snapshot บันทึกแล้ว');}
+function tlClick(e,el){const r=el.getBoundingClientRect();const p=Math.max(0,Math.min(100,(e.clientX-r.left)/r.width*100));document.getElementById('tlc').style.left=p.toFixed(1)+'%';const h=Math.floor(p/100*24),m=Math.floor((p/100*24-h)*60);document.getElementById('tll').textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;const v=document.getElementById('pb-vid');if(v&&v.duration)v.currentTime=v.duration*p/100;}
+
+// ── UTILS ──
+function nowT(){return new Date().toLocaleTimeString('th-TH',{hour12:false});}
+function nowT2(){return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});}
+function stColor(s){return s==='online'?'var(--green)':s==='starting'||s==='reconnecting'?'var(--amber)':'var(--red)';}
+function stLabel(s){return({online:'ONLINE',starting:'STARTING...',reconnecting:'RECONNECTING...',stopped:'STOPPED',error:'ERROR'})[s]||s.toUpperCase();}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+document.querySelectorAll('.mover').forEach(bg=>bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('on');}));
+
+// ── BOOT ──
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('be-inp').value=BE;
+  document.getElementById('be-url-lbl').textContent=BE;
+  [1,2,3,4].forEach(i=>document.getElementById('bg'+i)?.classList.toggle('on',i===S.grid));
+  document.getElementById('pb-date').value=new Date().toISOString().slice(0,10);
+  renderUsers();renderSChart();updStor();renderEvs();
+  checkBE().then(ok=>{if(ok)fetchStreams();});
+  setInterval(()=>{const r=S.localCams.filter(c=>c.recording&&c.status==='online').length;if(r){S.storUsed=Math.min(S.storUsed+r*.001,S.storMax);updStor();}},5000);
+});
+</script>
+</body>
+</html>
